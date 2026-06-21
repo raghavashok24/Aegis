@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kira AML Bot</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    :root {
+      --ink:#0D1117;--ink-mid:#3D4451;--ink-muted:#64748B;
+      --surface:#F7F8FA;--panel:#FFFFFF;--border:#E2E5EA;
+      --accent:#1A56DB;--accent-lo:#EEF3FF;
+      --red:#C0392B;--red-lo:#FDF2F2;
+      --amber:#D97706;--amber-lo:#FFFBEB;
+      --green:#16A34A;--green-lo:#F0FDF4;
+      --purple:#7C3AED;--purple-lo:#F5F3FF;
+      --mono:'SF Mono','Fira Code',monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:var(--surface);color:var(--ink);line-height:1.5;}
+    .app{display:flex;height:100vh;overflow:hidden;}
+    .sidebar{width:220px;flex-shrink:0;background:var(--ink);display:flex;flex-direction:column;}
+    .logo{padding:20px;border-bottom:1px solid rgba(255,255,255,.08);}
+    .logo .w{font-size:15px;font-weight:700;color:#fff;}
+    .logo .t{font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+    .nav{flex:1;padding:10px 0;}
+    .ni{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;border-left:3px solid transparent;font-size:13px;color:#94A3B8;transition:all .15s;}
+    .ni:hover{background:rgba(255,255,255,.05);color:#fff;}
+    .ni.active{border-left-color:var(--accent);background:rgba(26,86,219,.15);color:#fff;}
+    .sf{padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;}
+    .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;}
+    .dok{background:var(--green);}.derr{background:var(--red);}.didle{background:#475569;}
+    .main{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+    .topbar{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+    .tt{font-size:16px;font-weight:600;}.ts{font-size:12px;color:var(--ink-muted);}
+    .content{padding:24px 28px;flex:1;}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
+    .bp{background:var(--accent);color:#fff;}.bp:hover{background:#1547C0;}.bp:disabled{background:#93B4F5;cursor:not-allowed;}
+    .bg{background:transparent;color:var(--ink-mid);border:1px solid var(--border);}.bg:hover{background:var(--surface);}
+    .bsm{padding:5px 10px;font-size:12px;}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;}
+    .ct{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-muted);margin-bottom:14px;}
+    .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:18px;}
+    .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+    .kl{font-size:11px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+    .kv{font-size:30px;font-weight:700;letter-spacing:-1px;line-height:1;}
+    .ks{font-size:11px;color:var(--ink-muted);margin-top:3px;}
+    .cr{color:var(--red);}.ca{color:var(--amber);}.cb{color:var(--accent);}.cp{color:var(--purple);}.cg{color:var(--green);}
+    .twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+    .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+    .br{background:var(--red-lo);color:var(--red);}.ba{background:var(--amber-lo);color:var(--amber);}
+    .bb{background:var(--accent-lo);color:var(--accent);}.bg2{background:var(--green-lo);color:var(--green);}
+    .bpu{background:var(--purple-lo);color:var(--purple);}.bgr{background:var(--surface);color:var(--ink-muted);}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-muted);border-bottom:1px solid var(--border);background:var(--surface);}
+    td{padding:10px 12px;border-bottom:1px solid var(--border);}
+    tr:hover td{background:var(--surface);}
+    .br2{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12px;}
+    .bl{width:170px;flex-shrink:0;color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .bt{flex:1;background:var(--surface);border-radius:3px;height:10px;overflow:hidden;}
+    .bf{height:100%;border-radius:3px;transition:width .4s;}
+    .bc{width:28px;text-align:right;font-weight:600;}
+    .trow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+    .tcell{text-align:center;padding:12px 4px;border-radius:8px;}
+    .tcell .tn{font-size:24px;font-weight:700;}.tcell .tl{font-size:10px;margin-top:2px;}
+    .t1c{background:var(--green-lo);color:var(--green);}.t2c{background:var(--accent-lo);color:var(--accent);}
+    .t3c{background:var(--amber-lo);color:var(--amber);}.t4c{background:#FFF3E0;color:#E65100;}.t5c{background:var(--red-lo);color:var(--red);}
+    .fc{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+    .fh{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;}
+    .fh:hover{background:var(--surface);}
+    .fid{font-family:var(--mono);font-size:11px;color:var(--ink-muted);flex-shrink:0;}
+    .fr{font-weight:600;font-size:13px;flex:1;}
+    .fb{border-top:1px solid var(--border);padding:16px;background:#FAFBFC;}
+    .dg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    .dl label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-muted);margin-bottom:2px;}
+    .rat{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;line-height:1.65;color:var(--ink-mid);margin-bottom:12px;}
+    .tids{font-family:var(--mono);font-size:11px;background:var(--ink);color:#94A3B8;padding:8px 12px;border-radius:6px;margin-bottom:12px;word-break:break-all;}
+    .rfw{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .rfh{background:var(--accent-lo);padding:10px 14px;font-size:12px;font-weight:600;color:var(--accent);display:flex;justify-content:space-between;align-items:center;}
+    .rfb{padding:14px;font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:260px;overflow-y:auto;background:var(--panel);}
+    .sarb{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--red-lo);border:1px solid #FECACA;border-radius:6px;margin-bottom:12px;font-size:12px;font-weight:500;color:var(--red);}
+    .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+    .sel{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--panel);color:var(--ink);cursor:pointer;}
+    input.sel{min-width:180px;}
+    .empty{text-align:center;padding:60px 20px;color:var(--ink-muted);}
+    .ei{font-size:38px;margin-bottom:10px;}.eh{font-size:12px;color:#94A3B8;margin-top:6px;}
+    .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .prog{font-size:12px;color:var(--ink-muted);font-style:italic;margin-top:8px;}
+    .ebox{background:var(--red-lo);border:1px solid #FECACA;border-radius:8px;padding:12px 16px;color:var(--red);font-size:13px;margin-bottom:14px;}
+    .fg{margin-bottom:14px;}.fg label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;}
+    .fg input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--panel);color:var(--ink);font-family:var(--mono);}
+    .fg input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
+    .fn{font-size:11px;color:var(--ink-muted);margin-top:4px;}
+    .mani{background:var(--ink);color:#CBD5E1;border-radius:8px;padding:14px 16px;font-family:var(--mono);font-size:11px;line-height:1.9;}
+    .mk{color:#475569;}.mv{color:#93C5FD;}.mvok{color:#86EFAC;}.mvw{color:#FCA5A5;}
+    .sb{display:flex;align-items:center;gap:8px;}
+    .st{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+    .sf2{height:100%;border-radius:3px;}
+    .sf1c{background:var(--green);}.sf2c{background:var(--accent);}.sf3c{background:var(--amber);}.sf4c{background:#E65100;}.sf5c{background:var(--red);}
+    .infobox{background:var(--accent-lo);border:1px solid #BFDBFE;border-radius:8px;padding:14px 16px;font-size:13px;color:#1E40AF;margin-bottom:16px;line-height:1.6;}
+    .warnbox{background:var(--amber-lo);border:1px solid #FDE68A;border-radius:8px;padding:14px 16px;font-size:13px;color:#92400E;margin-bottom:16px;line-height:1.6;}
+    .divider{height:1px;background:var(--border);margin:18px 0;}
+    .step{display:flex;gap:12px;margin-bottom:14px;}
+    .stepnum{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+    .stepcontent{flex:1;padding-top:4px;}
+    code{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-family:var(--mono);font-size:12px;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const LS = {
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):d;}catch{return d;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
+};
+
+const DEFAULT_URL = '';
+
+function dl(content, filename, mime='text/plain') {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=filename;a.click();
+}
+
+function exportSummary(results) {
+  const lines=[`KIRA FINANCIAL AI — AML ${results.mode.toUpperCase()} REPORT`,'='.repeat(55),`Period: ${results.periodLabel}  Run: ${results.runTimestamp}`,`Rules: ${results.ruleVersion}`,'','EXECUTIVE SUMMARY','-'.repeat(40),`Applicants: ${results.totalApplicants} | Transactions: ${results.totalTransactionsAnalyzed}`,`Flags: ${results.totalFlags} | SAR-Risk: ${results.sarRiskFlags}`,'','FLAGS BY CATEGORY','-'.repeat(40),...Object.entries(results.flagsByCategory).map(([c,n])=>`  ${c}: ${n}`),'','RISK TIER DISTRIBUTION','-'.repeat(40),...[1,2,3,4,5].map(t=>`  Tier ${t}: ${results.riskTierDistribution[t]||0}`),'','TOP 5 ENTITIES','-'.repeat(40),...(results.top5||[]).map((e,i)=>`  ${i+1}. ${e.applicantName} — Score ${e.riskScore} | ${e.riskTierLabel} | ${e.flagCount} flags | SAR: ${e.sarRiskCount}`),'','HIGH SEVERITY FLAGS','-'.repeat(40),...results.entityResults.flatMap(e=>e.flags.filter(f=>f.severity==='High').flatMap(f=>[`\n${e.applicantName}`,`  ${f.id} — ${f.rule}`,`  ${f.rationale}`,f.sarRisk?'  ⚠ SAR RISK':'']).filter(Boolean))];
+  dl(lines.join('\n'),`AML-Summary-${results.periodLabel}.txt`);
+}
+
+function exportCSV(results) {
+  const hdr=['Flag ID','Period','Applicant','Rule','Category','Severity','Score','Tier','SAR Risk','Action','Tx IDs','Rationale'];
+  const rows=[hdr.join(',')];
+  results.entityResults.forEach(e=>e.flags.forEach(f=>rows.push([f.id,results.periodLabel,`"${e.applicantName.replace(/"/g,'""')}"`,`"${f.rule.replace(/"/g,'""')}"`,`"${f.category}"`,f.severity,e.riskScore,e.riskTier,f.sarRisk?'YES':'NO',`"${f.recommendedAction}"`,`"${f.txnIds.slice(0,5).join('; ')}"`,`"${f.rationale.replace(/"/g,'""').replace(/\n/g,' ')}"`].join(','))));
+  dl(rows.join('\n'),`AML-Flags-${results.periodLabel}.csv`,'text/csv');
+}
+
+// ── Badge helpers ─────────────────────────────────────────────────────────────
+const SevBadge=({s})=>s==='High'?<span className="badge br">High</span>:s==='Medium'?<span className="badge ba">Medium</span>:<span className="badge bgr">Low</span>;
+const CatBadge=({c})=>c==='Structuring & Layering'?<span className="badge bpu">Structuring</span>:c==='Network & Flow Pattern'?<span className="badge bb">Network</span>:<span className="badge ba">Behavioral</span>;
+const scoreCls=s=>s<=25?'sf1c':s<=50?'sf2c':s<=74?'sf3c':s<=89?'sf4c':'sf5c';
+const tierCls=t=>['','t1c','t2c','t3c','t4c','t5c'][t]||'t1c';
+const tierBadgeCls=t=>['','bg2','bb','ba','br','br'][t]||'bgr';
+
+// ── Flag Card ─────────────────────────────────────────────────────────────────
+function FlagCard({flag,applicantName,backendUrl}) {
+  const [open,setOpen]=useState(false);
+  const [tab,setTab]=useState('why');
+
+  const dlRFI=async()=>{
+    try {
+      const r=await fetch(`${backendUrl}/export/rfi`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flag,applicantName,periodLabel:flag._period||''})});
+      const txt=await r.text();
+      dl(txt,`RFI-${flag.id}.txt`);
+    } catch(e) { alert('Download failed: '+e.message); }
+  };
+
+  return (
+    <div className="fc">
+      <div className="fh" onClick={()=>setOpen(!open)}>
+        <span className="fid">{flag.id}</span>
+        <SevBadge s={flag.severity}/>
+        <CatBadge c={flag.category}/>
+        <span className="fr">{flag.rule}</span>
+        {flag.sarRisk&&<span className="badge br">⚠ SAR</span>}
+        <span style={{color:'var(--ink-muted)',fontSize:16,marginLeft:'auto'}}>{open?'▾':'▸'}</span>
+      </div>
+      {open&&(
+        <div className="fb">
+          {flag.sarRisk&&<div className="sarb">⚠ SAR Risk — potential filing obligation under 31 U.S.C. § 5318(g)</div>}
+          <div className="dg">
+            <div className="dl"><label>Rule Reference</label><span style={{fontSize:12,fontFamily:'var(--mono)',color:'var(--ink-muted)'}}>{flag.ruleRef}</span></div>
+            <div className="dl"><label>Action</label><span style={{fontWeight:600}}>{flag.recommendedAction}</span></div>
+            <div className="dl"><label>Counterparties</label><span>{flag.counterparties?.join(', ')||'—'}</span></div>
+            <div className="dl"><label>Status</label><span className="badge bb">{flag.status}</span></div>
+          </div>
+          <div className="rat">{flag.rationale}</div>
+          {flag.txnIds?.length>0&&<div className="tids"><span style={{color:'#475569'}}>Tx IDs: </span>{flag.txnIds.slice(0,8).join(' · ')}{flag.txnIds.length>8&&<span style={{color:'#475569'}}> +{flag.txnIds.length-8}</span>}</div>}
+          {flag.rfi&&(
+            <div className="rfw">
+              <div className="rfh">
+                <span>📋 Request for Information</span>
+                <div style={{display:'flex',gap:6}}>
+                  <button className="btn bg bsm" onClick={()=>setTab(tab==='why'?'what':'why')}>{tab==='why'?'View Questions →':'← View Justification'}</button>
+                  <button className="btn bp bsm" onClick={dlRFI}>⬇ Download RFI</button>
+                </div>
+              </div>
+              <div className="rfb">{tab==='why'?flag.rfi.why:flag.rfi.what}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function Dashboard({results,onRun,loading,msg,error,backendUrl}) {
+  const [mode,setMode]=useState('monthly');
+  const CAT_COLORS={'Behavioral Deviation':'#D97706','Structuring & Layering':'#7C3AED','Network & Flow Pattern':'#1A56DB'};
+  const maxCat=results?Math.max(...Object.values(results.flagsByCategory),1):1;
+
+  return (
+    <div>
+      <div className="card">
+        <div className="ct">Run Analysis</div>
+        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+          <select className="sel" value={mode} onChange={e=>setMode(e.target.value)}>
+            <option value="monthly">Monthly — Prior Calendar Month</option>
+            <option value="quarterly">Quarterly — Prior Calendar Quarter</option>
+          </select>
+          <button className="btn bp" onClick={()=>onRun(mode)} disabled={loading}>
+            {loading?<><span className="spin"/> Analyzing…</>:'▶ Run Analysis'}
+          </button>
+          {results&&<>
+            <button className="btn bg bsm" onClick={()=>exportSummary(results)}>⬇ Summary .txt</button>
+            <button className="btn bg bsm" onClick={()=>exportCSV(results)}>⬇ Flags .csv</button>
+          </>}
+        </div>
+        {loading&&<p className="prog">{msg}</p>}
+        {error&&<div className="ebox" style={{marginTop:10}}>⚠ {error}</div>}
+      </div>
+
+      {!results&&!loading&&(
+        <div className="empty"><div className="ei">🔍</div><p>No analysis run yet.</p><p className="eh">Make sure your backend URL and SumSub keys are set in Settings, then click Run Analysis.</p></div>
+      )}
+
+      {results&&(<>
+        <div className="kgrid">
+          <div className="kpi"><div className="kl">Applicants</div><div className="kv cb">{results.totalApplicants.toLocaleString()}</div><div className="ks">{results.periodLabel}</div></div>
+          <div className="kpi"><div className="kl">Transactions</div><div className="kv">{results.totalTransactionsAnalyzed.toLocaleString()}</div></div>
+          <div className="kpi"><div className="kl">Total Flags</div><div className="kv ca">{results.totalFlags}</div><div className="ks">High: {results.flagsBySeverity?.High||0} · Med: {results.flagsBySeverity?.Medium||0}</div></div>
+          <div className="kpi"><div className="kl">SAR-Risk</div><div className="kv cr">{results.sarRiskFlags}</div><div className="ks">§ 5318(g)</div></div>
+          <div className="kpi"><div className="kl">Tier 4–5</div><div className="kv cp">{(results.riskTierDistribution?.[4]||0)+(results.riskTierDistribution?.[5]||0)}</div></div>
+        </div>
+
+        <div className="twocol">
+          <div className="card">
+            <div className="ct">Flags by Category</div>
+            {Object.entries(results.flagsByCategory).map(([cat,n])=>(
+              <div className="br2" key={cat}>
+                <span className="bl" title={cat}>{cat}</span>
+                <div className="bt"><div className="bf" style={{width:`${n/maxCat*100}%`,background:CAT_COLORS[cat]||'#94A3B8'}}/></div>
+                <span className="bc">{n}</span>
+              </div>
+            ))}
+            {!Object.keys(results.flagsByCategory).length&&<p style={{fontSize:12,color:'var(--ink-muted)'}}>No flags.</p>}
+          </div>
+          <div className="card">
+            <div className="ct">Risk Tier Distribution</div>
+            <div className="trow">
+              {[1,2,3,4,5].map(t=>(
+                <div key={t} className={`tcell ${tierCls(t)}`}>
+                  <div className="tn">{results.riskTierDistribution?.[t]||0}</div>
+                  <div className="tl">T{t}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop:10,fontSize:11,color:'var(--ink-muted)'}}>T1 None · T2 Monitor · T3 Investigate · T4 SAR · T5 Mandatory</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="ct">Top 5 Highest-Risk Entities</div>
+          <table>
+            <thead><tr><th>Applicant</th><th>Score</th><th>Tier</th><th>Flags</th><th>SAR</th></tr></thead>
+            <tbody>
+              {(results.top5||[]).map(e=>(
+                <tr key={e.applicantId}>
+                  <td><div style={{fontWeight:600}}>{e.applicantName}</div><div style={{fontSize:11,color:'var(--ink-muted)',fontFamily:'var(--mono)'}}>{e.applicantId}</div></td>
+                  <td><div className="sb"><div className="st"><div className={`sf2 ${scoreCls(e.riskScore)}`} style={{width:`${e.riskScore}%`}}/></div><span style={{fontWeight:700,minWidth:28}}>{e.riskScore}</span></div></td>
+                  <td><span className={`badge ${tierBadgeCls(e.riskTier)}`}>T{e.riskTier}</span> {e.riskTierLabel}</td>
+                  <td style={{fontWeight:600}}>{e.flagCount}</td>
+                  <td>{e.sarRiskCount>0?<span className="badge br">⚠ {e.sarRiskCount}</span>:<span className="badge bg2">None</span>}</td>
+                </tr>
+              ))}
+              {!(results.top5||[]).length&&<tr><td colSpan={5} style={{textAlign:'center',color:'var(--ink-muted)',padding:20}}>No flagged entities.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card">
+          <div className="ct">Run Manifest</div>
+          <div className="mani">
+            <div><span className="mk">period:       </span><span className="mv">{results.periodLabel}</span></div>
+            <div><span className="mk">mode:         </span><span className="mv">{results.mode}</span></div>
+            <div><span className="mk">run_timestamp:</span><span className="mv">{results.runTimestamp}</span></div>
+            <div><span className="mk">applicants:   </span><span className="mvok">{results.totalApplicants}</span></div>
+            <div><span className="mk">transactions: </span><span className="mvok">{results.totalTransactionsAnalyzed}</span></div>
+            <div><span className="mk">flags:        </span><span className={results.totalFlags>0?'mvw':'mvok'}>{results.totalFlags}</span></div>
+            <div><span className="mk">sar_risk:     </span><span className={results.sarRiskFlags>0?'mvw':'mvok'}>{results.sarRiskFlags}</span></div>
+            <div><span className="mk">runtime:      </span><span className="mv">{results.runtimeMs?.toLocaleString()||'—'}ms</span></div>
+          </div>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+// ── Flags Tab ─────────────────────────────────────────────────────────────────
+function FlagsTab({results,backendUrl}) {
+  const [sev,setSev]=useState('All');
+  const [cat,setCat]=useState('All');
+  const [sar,setSar]=useState('All');
+  const [q,setQ]=useState('');
+
+  if (!results) return <div className="empty"><div className="ei">🚩</div><p>Run an analysis first.</p></div>;
+
+  const all=results.entityResults.flatMap(e=>e.flags.map(f=>({...f,_name:e.applicantName,_score:e.riskScore,_tier:e.riskTier,_period:results.periodLabel})));
+  const filtered=all.filter(f=>(sev==='All'||f.severity===sev)&&(cat==='All'||f.category===cat)&&(sar==='All'||f.sarRisk)&&(!q||f.rule.toLowerCase().includes(q.toLowerCase())||f._name.toLowerCase().includes(q.toLowerCase())));
+  const cats=[...new Set(all.map(f=>f.category))];
+
+  return (
+    <div>
+      <div className="filters">
+        <input type="text" placeholder="Search rule or entity…" className="sel" value={q} onChange={e=>setQ(e.target.value)}/>
+        <select className="sel" value={sev} onChange={e=>setSev(e.target.value)}><option value="All">All Severities</option><option>High</option><option>Medium</option></select>
+        <select className="sel" value={cat} onChange={e=>setCat(e.target.value)}><option value="All">All Categories</option>{cats.map(c=><option key={c}>{c}</option>)}</select>
+        <select className="sel" value={sar} onChange={e=>setSar(e.target.value)}><option value="All">All</option><option value="SAR">SAR Risk Only</option></select>
+        <span style={{fontSize:12,color:'var(--ink-muted)'}}>{filtered.length}/{all.length} flags</span>
+      </div>
+      {!filtered.length&&<div className="empty"><div className="ei">✅</div><p>No flags match filters.</p></div>}
+      {filtered.map(f=>(
+        <div key={f.id}>
+          <div style={{fontSize:11,color:'var(--ink-muted)',marginBottom:3,marginTop:8}}>{f._name} · Score {f._score} · Tier {f._tier}</div>
+          <FlagCard flag={f} applicantName={f._name} backendUrl={backendUrl}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Settings Tab ──────────────────────────────────────────────────────────────
+function SettingsTab({backendUrl,setBackendUrl}) {
+  const [url,setUrl]=useState(backendUrl);
+  const [testRes,setTestRes]=useState(null);
+  const [testing,setTesting]=useState(false);
+
+  const save=()=>{setBackendUrl(url);LS.set('kira_backend',url);setTestRes({ok:true,msg:'URL saved ✓'});};
+
+  const test=async()=>{
+    setTesting(true);setTestRes(null);
+    try {
+      const r=await fetch(`${url}/health`);
+      const d=await r.json();
+      if(d.ok) setTestRes({ok:true,msg:`✓ Connected — credentials: ${d.credentials} — token: ${d.token} — secret: ${d.secret}`});
+      else setTestRes({ok:false,msg:'Health check returned error'});
+    } catch(e) { setTestRes({ok:false,msg:`Connection failed: ${e.message}`}); }
+    finally { setTesting(false); }
+  };
+
+  return (
+    <div style={{maxWidth:540}}>
+      <div className="infobox">
+        This bot runs on a small backend on Render.com which signs requests to SumSub. Your SumSub API keys are stored in Render's environment variables — never in this file.
+      </div>
+
+      <div className="card">
+        <div className="ct">Step 1 — Render Backend URL</div>
+        <div className="fg">
+          <label>Your Render Service URL</label>
+          <input type="text" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://kira-aml-bot.onrender.com"/>
+          <p className="fn">From Render dashboard → your service → copy the URL shown at the top</p>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn bp" onClick={save}>Save URL</button>
+          <button className="btn bg" onClick={test} disabled={testing||!url}>{testing?'Testing…':'⚡ Test Connection'}</button>
+        </div>
+        {testRes&&<div style={{marginTop:10,padding:'8px 12px',borderRadius:6,fontSize:12,background:testRes.ok?'var(--green-lo)':'var(--red-lo)',color:testRes.ok?'var(--green)':'var(--red)'}}>{testRes.msg}</div>}
+      </div>
+
+      <div className="card">
+        <div className="ct">Step 2 — Add SumSub Keys in Render</div>
+        <div className="warnbox" style={{marginBottom:14}}>
+          Your API keys go in <strong>Render → your service → Environment tab</strong>, not here. They never appear in this file.
+        </div>
+        <div className="step"><div className="stepnum">1</div><div className="stepcontent">Go to <strong>render.com</strong> → click your <strong>kira-aml-bot</strong> service</div></div>
+        <div className="step"><div className="stepnum">2</div><div className="stepcontent">Click the <strong>Environment</strong> tab in the left sidebar</div></div>
+        <div className="step"><div className="stepnum">3</div><div className="stepcontent">Click <strong>Add Environment Variable</strong> and add:<br/><br/><code>SUMSUB_TOKEN</code> → your SumSub App Token<br/><code>SUMSUB_SECRET</code> → your SumSub Secret Key</div></div>
+        <div className="step"><div className="stepnum">4</div><div className="stepcontent">Click <strong>Save Changes</strong> — Render redeploys automatically (~30 seconds)</div></div>
+        <div className="step"><div className="stepnum">5</div><div className="stepcontent">Come back here and click <strong>Test Connection</strong> — you should see <em>credentials: configured</em></div></div>
+      </div>
+
+      <div className="card">
+        <div className="ct">Where to find SumSub keys</div>
+        <div className="step"><div className="stepnum">1</div><div className="stepcontent">Log in to <strong>sumsub.com</strong></div></div>
+        <div className="step"><div className="stepnum">2</div><div className="stepcontent">Click your <strong>avatar</strong> (top right) → <strong>Developer</strong></div></div>
+        <div className="step"><div className="stepnum">3</div><div className="stepcontent">Click <strong>App tokens</strong></div></div>
+        <div className="step"><div className="stepnum">4</div><div className="stepcontent">Copy the <strong>Token</strong> and <strong>Secret Key</strong> → paste into Render Environment tab</div></div>
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [tab,setTab]=useState('settings');
+  const [backendUrl,setBackendUrl]=useState(()=>LS.get('kira_backend',DEFAULT_URL));
+  const [results,setResults]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [msg,setMsg]=useState('');
+  const [error,setError]=useState(null);
+  const [backendOk,setBackendOk]=useState(null);
+
+  useEffect(()=>{
+    if(backendUrl) {
+      setTab('dashboard');
+      fetch(`${backendUrl}/health`).then(r=>r.json()).then(d=>setBackendOk(d.ok&&d.credentials==='configured')).catch(()=>setBackendOk(false));
+    }
+  },[backendUrl]);
+
+  const MSGS=['Fetching applicants from SumSub…','Building statistical baselines…','Running behavioral deviation rules…','Running structuring detection…','Analyzing network flow patterns…','Computing risk scores & tiers…','Generating RFIs…','Finalizing report…'];
+  let mi=0;
+
+  const onRun=async(mode)=>{
+    if(!backendUrl){setTab('settings');return;}
+    setLoading(true);setError(null);setMsg(MSGS[0]);
+    const iv=setInterval(()=>{mi=(mi+1)%MSGS.length;setMsg(MSGS[mi]);},4000);
+    try {
+      const r=await fetch(`${backendUrl}/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode})});
+      const d=await r.json();
+      if(!d.success) throw new Error(d.error||'Analysis failed');
+      setResults(d.results);setTab('dashboard');
+    } catch(e){setError(e.message);}
+    finally{clearInterval(iv);setLoading(false);setMsg('');}
+  };
+
+  const sarCount=results?.sarRiskFlags||0;
+  const hasUrl=!!backendUrl;
+
+  return (
+    <div className="app">
+      <div className="sidebar">
+        <div className="logo"><div className="w">Kira Financial AI</div><div className="t">AML Monitoring Bot</div></div>
+        <nav className="nav">
+          <div className={`ni ${tab==='dashboard'?'active':''}`} onClick={()=>setTab('dashboard')}>◈ Dashboard</div>
+          <div className={`ni ${tab==='flags'?'active':''}`} onClick={()=>setTab('flags')}>
+            🚩 Flags {results?.totalFlags>0&&<span className="badge ba" style={{marginLeft:'auto',fontSize:10}}>{results.totalFlags}</span>}
+          </div>
+          <div className={`ni ${tab==='settings'?'active':''}`} onClick={()=>setTab('settings')}>
+            ⚙ Settings {!hasUrl&&<span className="badge br" style={{marginLeft:'auto',fontSize:10}}>!</span>}
+          </div>
+        </nav>
+        <div className="sf">
+          <div style={{color:backendOk===true?'#86EFAC':backendOk===false?'#FCA5A5':'#94A3B8'}}>
+            <span className={`dot ${backendOk===true?'dok':backendOk===false?'derr':'didle'}`}/>
+            {backendOk===true?'Backend ready':backendOk===false?'Backend offline':'Not configured'}
+          </div>
+          {sarCount>0&&<div style={{marginTop:8,padding:'6px 8px',background:'rgba(192,57,43,.15)',borderRadius:5,color:'#F87171',fontSize:10}}>⚠ {sarCount} SAR-risk flag{sarCount>1?'s':''}</div>}
+        </div>
+      </div>
+
+      <div className="main">
+        <div className="topbar">
+          <div>
+            <div className="tt">{tab==='dashboard'?'AML Analysis Dashboard':tab==='flags'?'Flag Review':'Settings & Setup'}</div>
+            {results&&<div className="ts">{results.mode} · {results.periodLabel} · {results.runTimestamp?.slice(0,16).replace('T',' ')} UTC</div>}
+          </div>
+          {sarCount>0&&<span className="badge br">⚠ {sarCount} SAR-Risk</span>}
+        </div>
+        <div className="content">
+          {tab==='dashboard'&&<Dashboard results={results} onRun={onRun} loading={loading} msg={msg} error={error} backendUrl={backendUrl}/>}
+          {tab==='flags'&&<FlagsTab results={results} backendUrl={backendUrl}/>}
+          {tab==='settings'&&<SettingsTab backendUrl={backendUrl} setBackendUrl={setBackendUrl}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
