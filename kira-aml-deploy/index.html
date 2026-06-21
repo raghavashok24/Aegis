@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kira AML Bot — Compliance Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    /* ── Kira AML Design System ───────────────────────────── */
+    :root {
+      --ink:       #0D1117;
+      --ink-muted: #3D4451;
+      --surface:   #F7F8FA;
+      --panel:     #FFFFFF;
+      --border:    #E2E5EA;
+      --accent:    #1A56DB;   /* Kira blue */
+      --accent-lo: #EEF3FF;
+      --red:       #C0392B;
+      --red-lo:    #FDF2F2;
+      --amber:     #D97706;
+      --amber-lo:  #FFFBEB;
+      --green:     #16A34A;
+      --green-lo:  #F0FDF4;
+      --purple:    #7C3AED;
+      --purple-lo: #F5F3FF;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: var(--surface);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .app { display: flex; height: 100vh; overflow: hidden; }
+
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--ink);
+      color: #CBD5E1;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+    }
+
+    .sidebar-logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-logo .wordmark { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.3px; }
+    .sidebar-logo .tagline { font-size: 10px; color: #64748B; letter-spacing: .5px; text-transform: uppercase; margin-top: 2px; }
+
+    .sidebar-nav { flex: 1; padding: 12px 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 20px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all .15s;
+      font-size: 13px;
+      color: #94A3B8;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .nav-item.active { border-left-color: var(--accent); background: rgba(26,86,219,.15); color: #fff; }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-status { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: #475569; }
+    .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+    .status-dot.ok { background: var(--green); }
+    .status-dot.err { background: var(--red); }
+    .status-dot.idle { background: #64748B; }
+
+    .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+    .topbar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .topbar-title { font-size: 16px; font-weight: 600; }
+    .topbar-meta { font-size: 12px; color: var(--ink-muted); }
+
+    .content { padding: 24px 28px; flex: 1; }
+
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 6px; border: none;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #1547C0; }
+    .btn-primary:disabled { background: #93B4F5; cursor: not-allowed; }
+    .btn-ghost { background: transparent; color: var(--ink-muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); color: var(--ink); }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* ── Cards ───────────────────────────────────────────── */
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-muted); }
+
+    /* ── KPI Grid ────────────────────────────────────────── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .kpi-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+    .kpi-label { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .kpi-sub { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+    .kpi-red .kpi-value { color: var(--red); }
+    .kpi-amber .kpi-value { color: var(--amber); }
+    .kpi-blue .kpi-value { color: var(--accent); }
+    .kpi-purple .kpi-value { color: var(--purple); }
+
+    /* ── Charts ──────────────────────────────────────────── */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+
+    .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+    .bar-label { width: 160px; flex-shrink: 0; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-track { flex: 1; background: var(--surface); border-radius: 3px; height: 10px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+    .bar-count { width: 32px; text-align: right; font-weight: 600; font-size: 12px; }
+
+    .tier-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .tier-cell { text-align: center; padding: 12px 6px; border-radius: 8px; }
+    .tier-cell .tier-num { font-size: 22px; font-weight: 700; }
+    .tier-cell .tier-label { font-size: 10px; margin-top: 4px; }
+    .tier-1 { background: var(--green-lo); color: var(--green); }
+    .tier-2 { background: var(--accent-lo); color: var(--accent); }
+    .tier-3 { background: var(--amber-lo); color: var(--amber); }
+    .tier-4 { background: #FFF3E0; color: #E65100; }
+    .tier-5 { background: var(--red-lo); color: var(--red); }
+
+    /* ── Tables ──────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-muted); border-bottom: 1px solid var(--border); background: var(--surface); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: var(--surface); }
+
+    /* ── Badges ──────────────────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-red { background: var(--red-lo); color: var(--red); }
+    .badge-amber { background: var(--amber-lo); color: var(--amber); }
+    .badge-blue { background: var(--accent-lo); color: var(--accent); }
+    .badge-green { background: var(--green-lo); color: var(--green); }
+    .badge-purple { background: var(--purple-lo); color: var(--purple); }
+    .badge-gray { background: var(--surface); color: var(--ink-muted); }
+
+    /* ── Flag Cards ──────────────────────────────────────── */
+    .flag-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-select {
+      padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 12px; background: var(--panel); color: var(--ink); cursor: pointer;
+    }
+
+    .flag-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+    .flag-card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; cursor: pointer;
+      transition: background .1s;
+    }
+    .flag-card-header:hover { background: var(--surface); }
+    .flag-id { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); flex-shrink: 0; }
+    .flag-rule { font-weight: 600; font-size: 13px; flex: 1; }
+    .flag-card-body { border-top: 1px solid var(--border); padding: 16px; background: var(--surface); }
+
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .detail-item label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-muted); margin-bottom: 3px; }
+    .detail-item span { font-size: 13px; }
+
+    .rationale-box { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 12px; line-height: 1.6; color: var(--ink-muted); margin-bottom: 14px; }
+
+    .txn-ids { font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: #94A3B8; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; word-break: break-all; }
+
+    .rfi-section { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 14px; }
+    .rfi-header { background: var(--accent-lo); padding: 10px 14px; font-size: 12px; font-weight: 600; color: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+    .rfi-body { padding: 14px; font-size: 12px; line-height: 1.7; white-space: pre-wrap; background: var(--panel); max-height: 280px; overflow-y: auto; }
+    .rfi-body.sar { border-top: 2px solid var(--red); }
+
+    /* ── SAR Warning Banner ──────────────────────────────── */
+    .sar-banner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--red-lo); border: 1px solid #FECACA; border-radius: 6px; margin-bottom: 14px; font-size: 12px; font-weight: 500; color: var(--red); }
+
+    /* ── Run Panel ───────────────────────────────────────── */
+    .run-panel { display: flex; gap: 10px; align-items: center; }
+
+    /* ── Empty / Loading / Error States ─────────────────── */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state p { font-size: 13px; }
+    .empty-state .hint { font-size: 12px; color: #94A3B8; margin-top: 8px; }
+
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress-msg { font-size: 12px; color: var(--ink-muted); font-style: italic; margin-top: 8px; }
+
+    .error-box { background: var(--red-lo); border: 1px solid #FECACA; border-radius: 8px; padding: 14px 16px; color: var(--red); font-size: 13px; margin-bottom: 16px; }
+
+    /* ── Settings ────────────────────────────────────────── */
+    .settings-form { max-width: 480px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    .form-group input {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 13px; background: var(--panel); color: var(--ink);
+    }
+    .form-group input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-lo); }
+    .form-note { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+
+    /* ── Run Manifest ────────────────────────────────────── */
+    .manifest { background: var(--ink); color: #CBD5E1; border-radius: 8px; padding: 14px 16px; font-family: var(--font-mono); font-size: 11px; line-height: 1.8; }
+    .manifest .key { color: #64748B; }
+    .manifest .val { color: #93C5FD; }
+    .manifest .val-ok { color: #86EFAC; }
+    .manifest .val-warn { color: #FCA5A5; }
+
+    /* ── Score Meter ─────────────────────────────────────── */
+    .score-bar { display: flex; align-items: center; gap: 8px; }
+    .score-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .score-fill { height: 100%; border-radius: 3px; }
+    .score-fill.t1 { background: var(--green); }
+    .score-fill.t2 { background: var(--accent); }
+    .score-fill.t3 { background: var(--amber); }
+    .score-fill.t4 { background: #E65100; }
+    .score-fill.t5 { background: var(--red); }
+
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const { useState, useEffect, useCallback } = React;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'kira_aml_backend_url';
+const DEFAULT_URL = 'http://localhost:3001';
+
+function getSavedUrl() {
+  try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_URL; } catch { return DEFAULT_URL; }
+}
+function saveUrl(url) {
+  try { localStorage.setItem(STORAGE_KEY, url); } catch {}
+}
+
+function severityBadge(severity) {
+  if (severity === 'High') return <span className="badge badge-red">High</span>;
+  if (severity === 'Medium') return <span className="badge badge-amber">Medium</span>;
+  return <span className="badge badge-gray">Low</span>;
+}
+
+function categoryBadge(cat) {
+  if (cat === 'Structuring & Layering') return <span className="badge badge-purple">Structuring</span>;
+  if (cat === 'Network & Flow Pattern') return <span className="badge badge-blue">Network</span>;
+  if (cat === 'Behavioral Deviation') return <span className="badge badge-amber">Behavioral</span>;
+  return <span className="badge badge-gray">{cat}</span>;
+}
+
+function tierClass(tier) {
+  return ['', 'tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5'][tier] || 'tier-1';
+}
+
+function scoreClass(score) {
+  if (score <= 25) return 't1';
+  if (score <= 50) return 't2';
+  if (score <= 74) return 't3';
+  if (score <= 89) return 't4';
+  return 't5';
+}
+
+const CAT_COLORS = {
+  'Behavioral Deviation': '#D97706',
+  'Structuring & Layering': '#7C3AED',
+  'Network & Flow Pattern': '#1A56DB',
+  'Document Anomaly': '#64748B',
+};
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function apiPost(backendUrl, path, body) {
+  const resp = await fetch(`${backendUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+async function downloadExport(backendUrl, path, body, filename) {
+  const resp = await fetch(`${backendUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await resp.text();
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Flag Card ─────────────────────────────────────────────────────────────────
+function FlagCard({ flag, applicantName, periodLabel, backendUrl }) {
+  const [open, setOpen] = useState(false);
+  const [rfiTab, setRfiTab] = useState('why');
+
+  const downloadRFI = async () => {
+    await downloadExport(backendUrl, '/export/rfi', { applicantName, flag, periodLabel }, `RFI-${flag.id}.txt`);
+  };
+
+  return (
+    <div className="flag-card">
+      <div className="flag-card-header" onClick={() => setOpen(!open)}>
+        <span className="flag-id">{flag.id}</span>
+        {severityBadge(flag.severity)}
+        {categoryBadge(flag.category)}
+        <span className="flag-rule">{flag.rule}</span>
+        {flag.sarRisk && <span className="badge badge-red">⚠ SAR</span>}
+        <span style={{ fontSize: 16, color: 'var(--ink-muted)', marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
+      </div>
+
+      {open && (
+        <div className="flag-card-body">
+          {flag.sarRisk && (
+            <div className="sar-banner">
+              ⚠ SAR Risk — Potential filing obligation under 31 U.S.C. § 5318(g)
+            </div>
+          )}
+
+          <div className="detail-grid">
+            <div className="detail-item">
+              <label>Rule Reference</label>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>{flag.ruleRef}</span>
+            </div>
+            <div className="detail-item">
+              <label>Risk Category</label>
+              {categoryBadge(flag.category)}
+            </div>
+            <div className="detail-item">
+              <label>Counterparties</label>
+              <span>{flag.counterparties && flag.counterparties.length > 0 ? flag.counterparties.join(', ') : '—'}</span>
+            </div>
+            <div className="detail-item">
+              <label>Recommended Action</label>
+              <span style={{ fontWeight: 600 }}>{flag.recommendedAction}</span>
+            </div>
+          </div>
+
+          <div className="rationale-box">{flag.rationale}</div>
+
+          {flag.txnIds && flag.txnIds.length > 0 && (
+            <div className="txn-ids">
+              <span style={{ color: '#64748B' }}>Transaction IDs: </span>
+              {flag.txnIds.slice(0, 10).join(' · ')}
+              {flag.txnIds.length > 10 && <span style={{ color: '#64748B' }}> + {flag.txnIds.length - 10} more</span>}
+            </div>
+          )}
+
+          {flag.rfi && (
+            <div className="rfi-section">
+              <div className="rfi-header">
+                <span>📋 Request for Information (RFI)</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setRfiTab(rfiTab === 'why' ? 'what' : 'why')}>
+                    {rfiTab === 'why' ? 'View Questions →' : '← View Justification'}
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={downloadRFI}>⬇ Download RFI</button>
+                </div>
+              </div>
+              <div className={`rfi-body${flag.sarRisk ? ' sar' : ''}`}>
+                {rfiTab === 'why' ? flag.rfi.whyIssued : flag.rfi.whatRfiMustContain}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Dashboard Tab ─────────────────────────────────────────────────────────────
+function DashboardTab({ results, backendUrl, onRunAnalysis, loading, loadingMsg, error }) {
+  const [mode, setMode] = useState('monthly');
+
+  const downloadSummary = async () => {
+    await downloadExport(backendUrl, '/export/summary', { results }, `AML-Summary-${results.periodLabel}.txt`);
+  };
+  const downloadCSV = async () => {
+    await downloadExport(backendUrl, '/export/csv', { results }, `AML-Flags-${results.periodLabel}.csv`);
+  };
+
+  const maxCatCount = results ? Math.max(...Object.values(results.flagsByCategory), 1) : 1;
+
+  return (
+    <div>
+      {/* Run Controls */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <span className="card-title">Run Analysis</span>
+          {results && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={downloadSummary}>⬇ Summary Report</button>
+              <button className="btn btn-ghost btn-sm" onClick={downloadCSV}>⬇ CSV Export</button>
+            </div>
+          )}
+        </div>
+        <div className="run-panel">
+          <select className="filter-select" value={mode} onChange={e => setMode(e.target.value)}>
+            <option value="monthly">Monthly (Prior Calendar Month)</option>
+            <option value="quarterly">Quarterly (Prior Calendar Quarter)</option>
+          </select>
+          <button
+            className="btn btn-primary"
+            onClick={() => onRunAnalysis(mode)}
+            disabled={loading}
+          >
+            {loading ? <><span className="spinner" /> Running…</> : '▶ Run Analysis'}
+          </button>
+        </div>
+        {loading && <p className="progress-msg">{loadingMsg}</p>}
+        {error && <div className="error-box" style={{ marginTop: 12 }}>⚠ {error}</div>}
+      </div>
+
+      {!results && !loading && (
+        <div className="empty-state">
+          <div className="icon">🔍</div>
+          <p>No analysis results yet.</p>
+          <p className="hint">Select a mode and click Run Analysis to fetch live data from SumSub.</p>
+        </div>
+      )}
+
+      {results && (
+        <>
+          {/* KPI Row */}
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-label">Applicants Analyzed</div>
+              <div className="kpi-value">{results.totalApplicants.toLocaleString()}</div>
+              <div className="kpi-sub">Period: {results.periodLabel}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Transactions Reviewed</div>
+              <div className="kpi-value kpi-blue">{results.totalTransactionsAnalyzed.toLocaleString()}</div>
+            </div>
+            <div className="kpi-card kpi-amber">
+              <div className="kpi-label">Total Flags</div>
+              <div className="kpi-value">{results.totalFlags}</div>
+              <div className="kpi-sub">High: {results.flagsBySeverity.High} · Med: {results.flagsBySeverity.Medium}</div>
+            </div>
+            <div className="kpi-card kpi-red">
+              <div className="kpi-label">SAR-Risk Flags</div>
+              <div className="kpi-value">{results.sarRiskFlags}</div>
+              <div className="kpi-sub">31 U.S.C. § 5318(g)</div>
+            </div>
+            <div className="kpi-card kpi-purple">
+              <div className="kpi-label">Tier 4–5 Entities</div>
+              <div className="kpi-value">{(results.riskTierDistribution[4] || 0) + (results.riskTierDistribution[5] || 0)}</div>
+              <div className="kpi-sub">SAR consideration</div>
+            </div>
+          </div>
+
+          {/* Charts */}
+          <div className="charts-row">
+            <div className="card">
+              <div className="card-header"><span className="card-title">Flags by Category</span></div>
+              <div className="bar-chart">
+                {Object.entries(results.flagsByCategory).map(([cat, count]) => (
+                  <div className="bar-row" key={cat}>
+                    <span className="bar-label" title={cat}>{cat}</span>
+                    <div className="bar-track">
+                      <div className="bar-fill" style={{ width: `${(count / maxCatCount) * 100}%`, background: CAT_COLORS[cat] || '#94A3B8' }} />
+                    </div>
+                    <span className="bar-count">{count}</span>
+                  </div>
+                ))}
+                {Object.keys(results.flagsByCategory).length === 0 && (
+                  <p style={{ fontSize: 12, color: 'var(--ink-muted)' }}>No flags generated.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header"><span className="card-title">Risk Tier Distribution</span></div>
+              <div className="tier-grid">
+                {[1,2,3,4,5].map(t => (
+                  <div key={t} className={`tier-cell ${tierClass(t)}`}>
+                    <div className="tier-num">{results.riskTierDistribution[t] || 0}</div>
+                    <div className="tier-label">Tier {t}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-muted)' }}>
+                Tier 1 No Action · 2 Enhanced · 3 Investigator · 4 SAR · 5 Mandatory SAR
+              </div>
+            </div>
+          </div>
+
+          {/* Top Entities */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header"><span className="card-title">Top 5 Highest-Risk Entities</span></div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Applicant</th>
+                    <th>Risk Score</th>
+                    <th>Tier</th>
+                    <th>Flags</th>
+                    <th>SAR Risk</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.top5Entities.map(e => (
+                    <tr key={e.applicantId}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{e.applicantName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)' }}>{e.applicantId}</div>
+                      </td>
+                      <td>
+                        <div className="score-bar">
+                          <div className="score-track">
+                            <div className={`score-fill ${scoreClass(e.riskScore)}`} style={{ width: `${e.riskScore}%` }} />
+                          </div>
+                          <span style={{ fontWeight: 700, fontSize: 14, minWidth: 28 }}>{e.riskScore}</span>
+                        </div>
+                      </td>
+                      <td><span className={`badge ${['','badge-green','badge-blue','badge-amber','badge-red','badge-red'][e.riskTier]}`}>T{e.riskTier}</span> {e.riskTierLabel}</td>
+                      <td style={{ fontWeight: 600 }}>{e.flagCount}</td>
+                      <td>{e.sarRiskCount > 0 ? <span className="badge badge-red">⚠ {e.sarRiskCount}</span> : <span className="badge badge-green">None</span>}</td>
+                      <td>{e.riskTierLabel}</td>
+                    </tr>
+                  ))}
+                  {results.top5Entities.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-muted)', padding: 20 }}>No flagged entities.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Run Manifest */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">Run Manifest</span></div>
+            <div className="manifest">
+              <div><span className="key">period:       </span><span className="val">{results.periodLabel}</span></div>
+              <div><span className="key">mode:         </span><span className="val">{results.mode}</span></div>
+              <div><span className="key">run_timestamp:</span><span className="val">{results.runTimestamp}</span></div>
+              <div><span className="key">rule_version: </span><span className="val">{results.ruleVersion}</span></div>
+              <div><span className="key">review_start: </span><span className="val">{results.reviewStart}</span></div>
+              <div><span className="key">review_end:   </span><span className="val">{results.reviewEnd}</span></div>
+              <div><span className="key">applicants:   </span><span className="val-ok">{results.totalApplicants}</span></div>
+              <div><span className="key">transactions: </span><span className="val-ok">{results.totalTransactionsAnalyzed}</span></div>
+              <div><span className="key">flags:        </span><span className={results.totalFlags > 0 ? 'val-warn' : 'val-ok'}>{results.totalFlags}</span></div>
+              <div><span className="key">sar_risk:     </span><span className={results.sarRiskFlags > 0 ? 'val-warn' : 'val-ok'}>{results.sarRiskFlags}</span></div>
+              <div><span className="key">runtime_ms:   </span><span className="val">{results.runtimeMs?.toLocaleString() || '—'}</span></div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Flags Tab ─────────────────────────────────────────────────────────────────
+function FlagsTab({ results, backendUrl }) {
+  const [filterSeverity, setFilterSeverity] = useState('All');
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterSAR, setFilterSAR] = useState('All');
+  const [search, setSearch] = useState('');
+
+  if (!results) {
+    return (
+      <div className="empty-state">
+        <div className="icon">🚩</div>
+        <p>No analysis run yet.</p>
+        <p className="hint">Go to the Dashboard tab and run an analysis to see flags here.</p>
+      </div>
+    );
+  }
+
+  const allFlags = results.entityResults.flatMap(entity =>
+    entity.flags.map(f => ({ ...f, _entityName: entity.applicantName, _entityScore: entity.riskScore, _entityTier: entity.riskTier, _periodLabel: results.periodLabel }))
+  );
+
+  const filtered = allFlags.filter(f => {
+    if (filterSeverity !== 'All' && f.severity !== filterSeverity) return false;
+    if (filterCategory !== 'All' && f.category !== filterCategory) return false;
+    if (filterSAR === 'SAR Only' && !f.sarRisk) return false;
+    if (search && !f.rule.toLowerCase().includes(search.toLowerCase()) &&
+        !f._entityName.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const categories = [...new Set(allFlags.map(f => f.category))];
+
+  return (
+    <div>
+      <div className="flag-filters">
+        <input
+          type="text"
+          placeholder="Search rules, entities…"
+          className="filter-select"
+          style={{ minWidth: 200 }}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <select className="filter-select" value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)}>
+          <option value="All">All Severities</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <select className="filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+          <option value="All">All Categories</option>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select className="filter-select" value={filterSAR} onChange={e => setFilterSAR(e.target.value)}>
+          <option value="All">All Flags</option>
+          <option value="SAR Only">SAR Risk Only</option>
+        </select>
+        <span style={{ fontSize: 12, color: 'var(--ink-muted)', marginLeft: 4, alignSelf: 'center' }}>
+          {filtered.length} of {allFlags.length} flags
+        </span>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="empty-state">
+          <div className="icon">✅</div>
+          <p>No flags match the current filters.</p>
+        </div>
+      )}
+
+      {filtered.map(flag => (
+        <div key={flag.id}>
+          <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginBottom: 4, marginTop: 6 }}>
+            {flag._entityName} · Score {flag._entityScore} · Tier {flag._entityTier}
+          </div>
+          <FlagCard
+            key={flag.id}
+            flag={flag}
+            applicantName={flag._entityName}
+            periodLabel={flag._periodLabel}
+            backendUrl={backendUrl}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Settings Tab ──────────────────────────────────────────────────────────────
+function SettingsTab({ backendUrl, setBackendUrl }) {
+  const [testStatus, setTestStatus] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const [localUrl, setLocalUrl] = useState(backendUrl);
+
+  const testConnection = async () => {
+    setTesting(true); setTestStatus(null);
+    try {
+      const resp = await fetch(`${localUrl}/health`);
+      const data = await resp.json();
+      if (data.ok) setTestStatus({ ok: true, msg: `Connected ✓ — Server time: ${data.time}` });
+      else setTestStatus({ ok: false, msg: 'Health endpoint returned ok:false' });
+    } catch (e) {
+      setTestStatus({ ok: false, msg: `Connection failed: ${e.message}` });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const saveSettings = () => {
+    setBackendUrl(localUrl);
+    saveUrl(localUrl);
+    setTestStatus({ ok: true, msg: 'URL saved.' });
+  };
+
+  return (
+    <div>
+      <div className="card settings-form">
+        <div className="card-header"><span className="card-title">Backend Configuration</span></div>
+
+        <div className="form-group">
+          <label>Railway Backend URL</label>
+          <input
+            type="text"
+            value={localUrl}
+            onChange={e => setLocalUrl(e.target.value)}
+            placeholder="https://your-app.railway.app"
+          />
+          <p className="form-note">Your Railway deployment URL. Must include https://. No trailing slash.</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" onClick={saveSettings}>Save</button>
+          <button className="btn btn-ghost" onClick={testConnection} disabled={testing}>
+            {testing ? '…Testing' : '⚡ Test Connection'}
+          </button>
+        </div>
+
+        {testStatus && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, fontSize: 12,
+            background: testStatus.ok ? 'var(--green-lo)' : 'var(--red-lo)',
+            color: testStatus.ok ? 'var(--green)' : 'var(--red)', }}>
+            {testStatus.msg}
+          </div>
+        )}
+      </div>
+
+      <div className="divider" />
+
+      <div className="card" style={{ maxWidth: 480 }}>
+        <div className="card-header"><span className="card-title">Security Reminder</span></div>
+        <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-muted)' }}>
+          <p>🔒 <strong>SumSub API credentials must be stored only in Railway's Environment Variables tab</strong> as <code>SUMSUB_TOKEN</code> and <code>SUMSUB_SECRET</code>.</p>
+          <br />
+          <p>Never paste API keys into this frontend, any code file, or commit them to GitHub. The backend server reads them exclusively from environment variables and signs each SumSub request with HMAC-SHA256.</p>
+          <br />
+          <p>This frontend never handles or transmits credentials — it only communicates with your Railway backend via the URL above.</p>
+        </div>
+      </div>
+
+      <div className="divider" />
+
+      <div className="card" style={{ maxWidth: 480 }}>
+        <div className="card-header"><span className="card-title">Rule Engine Coverage</span></div>
+        <table style={{ fontSize: 12 }}>
+          <thead><tr><th>Category</th><th>Rules</th></tr></thead>
+          <tbody>
+            <tr><td>Behavioral Deviation (Spec §4.1)</td><td>8 rules</td></tr>
+            <tr><td>Structuring & Layering (Spec §4.2)</td><td>4 rules</td></tr>
+            <tr><td>Network & Flow (Spec §4.3)</td><td>3 rules</td></tr>
+            <tr><td>Risk Scoring (Compendium Rule 22)</td><td>5-tier classification</td></tr>
+            <tr><td>RFI Generation</td><td>Per-flag, 2-part</td></tr>
+          </tbody>
+        </table>
+        <p style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 8 }}>
+          Spec v0.1 + Master Rule Compendium (30 Core Rules, 20+ Sources)
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState('dashboard');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
+  const [error, setError] = useState(null);
+  const [backendUrl, setBackendUrl] = useState(getSavedUrl);
+  const [backendOk, setBackendOk] = useState(null);
+
+  // Quick health check on mount
+  useEffect(() => {
+    fetch(`${backendUrl}/health`)
+      .then(r => r.json())
+      .then(d => setBackendOk(d.ok))
+      .catch(() => setBackendOk(false));
+  }, [backendUrl]);
+
+  const runAnalysis = async (mode) => {
+    setLoading(true);
+    setError(null);
+    setLoadingMsg('Fetching applicants from SumSub…');
+
+    const msgs = [
+      'Fetching applicants from SumSub…',
+      'Building statistical baselines…',
+      'Running behavioral deviation rules…',
+      'Running structuring detection…',
+      'Analyzing network flow patterns…',
+      'Computing risk scores & tiers…',
+      'Generating RFIs…',
+      'Finalizing report…',
+    ];
+    let msgIdx = 0;
+    const interval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % msgs.length;
+      setLoadingMsg(msgs[msgIdx]);
+    }, 4000);
+
+    try {
+      const data = await apiPost(backendUrl, '/analyze', { mode });
+      setResults(data.results);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      clearInterval(interval);
+      setLoading(false);
+      setLoadingMsg('');
+    }
+  };
+
+  const totalSARFlags = results?.sarRiskFlags || 0;
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="sidebar-logo">
+          <div className="wordmark">Kira Financial AI</div>
+          <div className="tagline">AML Monitoring Bot</div>
+        </div>
+        <nav className="sidebar-nav">
+          <div className={`nav-item ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => setTab('dashboard')}>
+            <span className="icon">◈</span> Dashboard
+          </div>
+          <div className={`nav-item ${tab === 'flags' ? 'active' : ''}`} onClick={() => setTab('flags')}>
+            <span className="icon">🚩</span> Flags
+            {results && results.totalFlags > 0 && (
+              <span className="badge badge-amber" style={{ marginLeft: 'auto', fontSize: 10 }}>{results.totalFlags}</span>
+            )}
+          </div>
+          <div className={`nav-item ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
+            <span className="icon">⚙</span> Settings
+          </div>
+        </nav>
+        <div className="sidebar-status">
+          <span className={`status-dot ${backendOk === true ? 'ok' : backendOk === false ? 'err' : 'idle'}`} />
+          {backendOk === true ? 'Backend connected' : backendOk === false ? 'Backend offline' : 'Checking…'}
+          {totalSARFlags > 0 && (
+            <div style={{ marginTop: 8, padding: '6px 8px', background: 'rgba(192,57,43,.15)', borderRadius: 5, color: '#F87171', fontSize: 10 }}>
+              ⚠ {totalSARFlags} SAR-risk flag{totalSARFlags > 1 ? 's' : ''} pending
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="main">
+        <div className="topbar">
+          <div>
+            <div className="topbar-title">
+              {tab === 'dashboard' && 'AML Analysis Dashboard'}
+              {tab === 'flags' && 'Flag Review'}
+              {tab === 'settings' && 'Settings'}
+            </div>
+            {results && (
+              <div className="topbar-meta">
+                {results.mode.charAt(0).toUpperCase() + results.mode.slice(1)} · {results.periodLabel} · {results.runTimestamp?.slice(0, 16).replace('T', ' ')} UTC
+              </div>
+            )}
+          </div>
+          {results && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {totalSARFlags > 0 && (
+                <span className="badge badge-red" style={{ fontSize: 12 }}>
+                  ⚠ {totalSARFlags} SAR-Risk
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="content">
+          {tab === 'dashboard' && (
+            <DashboardTab
+              results={results}
+              backendUrl={backendUrl}
+              onRunAnalysis={runAnalysis}
+              loading={loading}
+              loadingMsg={loadingMsg}
+              error={error}
+            />
+          )}
+          {tab === 'flags' && (
+            <FlagsTab results={results} backendUrl={backendUrl} />
+          )}
+          {tab === 'settings' && (
+            <SettingsTab backendUrl={backendUrl} setBackendUrl={setBackendUrl} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
