@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const https = require('https');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
@@ -449,7 +450,10 @@ app.post('/export/rfi', (req, res) => {
 });
 
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log('Kira AML Bot running on port ' + PORT));
