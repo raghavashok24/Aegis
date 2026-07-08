@@ -18,67 +18,64 @@
 
 ---
 
-## Overview
+## What it is
 
-The Kira AML Bot connects directly to your SumSub KYT account, pulls every transaction in the selected period, and runs a statistical and pattern-based detection engine across all entities. The results are delivered as an interactive dashboard — flags organized by risk tier, each one expandable to show the full rationale, the exact SumSub and internal transaction IDs involved, and a downloadable RFI letter for Tier 4+ entities.
+The Kira AML Bot is a production compliance tool that connects directly to your SumSub KYT account, analyzes every transaction in the selected review period, and delivers a ranked set of flags with risk scores, detection rationales, clickable transaction IDs, and formal RFI letters — all without any manual data export or database.
 
-The system is fully stateless. There is no database, no file storage, and no manual data export. Every run starts from a live SumSub fetch.
+The entire system lives in two files: a Node.js backend that handles SumSub authentication and the detection engine, and an HTML frontend served directly from the same Render deployment. Open your Render URL in a browser and the dashboard loads immediately.
 
 ---
 
 ## Interface
 
-**Dashboard** — KPI cards, flags by category, risk tier distribution, and the top five highest-risk entities ranked by composite score.
+The dashboard has two views.
 
-![Dashboard](https://raw.githubusercontent.com/raghavashok24/Aegis/main/docs/dashboard.png)
+**Dashboard** shows KPI cards (applicants, transactions, total flags, SAR-risk count, Tier 4–5 entities), a flags-by-category bar chart, a risk tier distribution grid, and a table of the top five highest-risk entities ranked by composite score. A month picker lets you select any combination of months and year, or use Prior Month and Prior Quarter shortcuts. After a run, one-click exports produce a summary `.txt` report and a full flags `.csv`.
 
-**Flag Review** — every flag across all entities, filterable by severity, category, and SAR risk. Each card expands to show the detection rationale, both SumSub and internal transaction IDs with direct cockpit links, and the RFI panel.
-
-![Flags](https://raw.githubusercontent.com/raghavashok24/Aegis/main/docs/flags.png)
-
-**Month Picker** — choose any combination of months and year, or use Prior Month / Prior Quarter shortcuts. Multi-month selections run sequential evaluations with independent baselines per period.
-
-![Month Picker](https://raw.githubusercontent.com/raghavashok24/Aegis/main/docs/picker.png)
+**Flag Review** lists every flag across all entities. Each card shows the flag ID, severity, category, rule name, and SAR indicator. Expanding a card reveals the full detection rationale, the SumSub and internal transaction IDs involved (with direct links to the SumSub cockpit), counterparties, and — for Tier 4+ entities — a consolidated RFI letter downloadable as `.txt`.
 
 ---
 
-## How it works
+## Architecture
 
 ```
-  Browser (your Render URL)
-        │
-        │  POST /analyze
-        ▼
-  Render Backend  ──── HMAC-SHA256 ────►  SumSub KYT API
-        │                                  (all transactions)
-        │
-        ├─ Groups transactions by applicant
-        ├─ Classifies entities (Established / New / Dormant-returning)
-        ├─ Builds per-entity statistical baselines (6 months or 4 quarters)
-        ├─ Runs detection rules across all categories
-        ├─ Deduplicates correlated flags into clusters
-        ├─ Scores each entity 0–100 with tier gates
-        └─ Generates consolidated RFI for Tier 4+ entities
-        │
-        ▼
-  Dashboard  (flags · transaction IDs · risk tiers · RFI downloads)
+  Browser
+      │
+      │  POST /analyze
+      ▼
+  Render (Node.js + Express)
+      │
+      ├── Authenticates every request to SumSub with HMAC-SHA256
+      ├── Fetches all transactions in the review window (paginated)
+      ├── Groups transactions by applicant ID
+      ├── Classifies each entity (Established / New / Dormant-returning)
+      ├── Builds per-entity statistical baseline (μ, σ) from prior periods
+      ├── Runs detection rules across three categories
+      ├── Deduplicates correlated flags into clusters
+      ├── Scores each entity 0–100 with tier gates
+      └── Generates consolidated RFI for Tier 4+ entities
+      │
+      ▼
+  JSON response → Dashboard renders results
 ```
+
+The system is fully stateless. No database, no file storage, no cached baselines. Every run is a fresh fetch from SumSub.
+
+**Stack:** Node.js 20, Express 4.18, SumSub KYT API, React 18 (CDN, no bundler), deployed on Render.
 
 ---
 
 ## Entity classification
 
-Before any rule evaluates, every entity is classified based on its transaction history. This gate eliminates the majority of false positives from thin-baseline edge cases.
+Every entity is classified before any rule runs. This gate prevents statistical rules from firing on entities with insufficient history.
 
-| Class | Definition | Treatment |
-|-------|-----------|-----------|
-| Established | Tenure in data AND 8+ baseline txns across 2+ baseline months | Full statistical ruleset |
-| New | Fails the baseline gate | Behavioral rules do not apply — routes to enhanced due diligence |
-| Dormant-returning | Established history, then fewer than 3 tx/period for 2+ consecutive periods | Dormancy rule eligible |
+| Class | Criteria | Treatment |
+|-------|---------|-----------|
+| Established | Passes the minimum sample gate (8+ baseline txns across 2+ months) | Full detection ruleset |
+| New | Fails the sample gate | Behavioral rules skipped — routes to enhanced due diligence track |
+| Dormant-returning | Established history followed by fewer than 3 tx/period for 2+ periods | Eligible for Dormancy Transition rule |
 
-The baseline window is trailing 6 months for monthly runs and trailing 4 quarters for quarterly runs, computed per entity.
-
-Multi-month requests (e.g. Feb–Jun) run as five sequential monthly evaluations each with their own independent rolling baseline. Results are then merged per entity.
+The baseline window is the trailing 6 months for monthly runs and trailing 4 quarters for quarterly runs. Multi-month requests run as sequential monthly evaluations, each with its own independent rolling baseline, then merge results per entity.
 
 ---
 
@@ -86,18 +83,18 @@ Multi-month requests (e.g. Feb–Jun) run as five sequential monthly evaluations
 
 ### Behavioral deviation
 
-Applies to Established entities only. All behavioral rules default to Medium severity and promote to High only when the deviation reaches 3× baseline or when a co-occurring Structuring or Network flag is present.
+Applies to Established entities only. All behavioral rules default to Medium severity. They promote to High when the deviation reaches 3× baseline or when a co-occurring Structuring or Network flag is present.
 
 | Rule | Trigger |
 |------|---------|
-| Volume Spike | Count > μ + 2σ, and ≥ 2× baseline mean, and absolute count ≥ 10 |
-| Amount Spike | Volume > μ + 2σ, and ≥ 2× baseline mean, and ≥ $25K above baseline mean |
+| Volume Spike | Count > μ + 2σ, ≥ 2× baseline mean, absolute count ≥ 10 |
+| Amount Spike | Volume > μ + 2σ, ≥ 2× baseline mean, ≥ $25K above baseline mean |
 | Velocity Escalation | Weekly cadence ≥ 2× baseline, baseline ≥ 5 tx/week, sustained ≥ 2 consecutive weeks |
-| Size Threshold Jump | Avg tx > 150% of prior avg, prior period had ≥ 8 tx, avg increase ≥ $5K |
+| Size Threshold Jump | Avg tx > 150% of prior avg, prior period ≥ 8 tx, avg increase ≥ $5K |
 | Concentration Risk | >70% outbound to single beneficiary, ≥ 10 outbound tx, co-occurring flag required |
 | Round-Dollar Clustering | >60% of tx at exact round amounts, ≥ 10 tx, co-occurring flag required |
 | Dormancy Transition | Established prior activity, dormant ≥ 2 periods, then ≥ 5 tx and ≥ $25K |
-| Temporal Concentration | >60% of quarterly volume in one month, quarterly volume ≥ $100K, ≥ 15 tx *(quarterly only)* |
+| Temporal Concentration | >60% of quarterly volume in one month, ≥ $100K quarterly volume, ≥ 15 tx *(quarterly only)* |
 
 ### Structuring & layering
 
@@ -107,152 +104,72 @@ Applies to all entities. All flags cite 31 U.S.C. § 5324. Every rule requires s
 |------|---------|
 | Structuring Index | ≥ 30% of tx in $8K–$9,999 band, ≥ 4 tx in band, entity median tx < $15K |
 | 72-Hour Clustering | ≥ 3 tx each $3K–$9,999, same direction, within 72h, aggregate > $10K |
-| Frequency & Uniformity | ≥ 5 tx with <5% amount variance, each < $10K, not matching a recurring payroll/rent/subscription cadence |
+| Frequency & Uniformity | ≥ 5 tx with <5% amount variance, each < $10K, not matching a recurring payroll/rent cadence |
 | Split Payments | ≥ 2 payments to same beneficiary within 72h, each $3K–$9,999, aggregate > $10K |
 
 ### Network & flow patterns
 
-Applies to all entities. These rules detect multi-party money movement typologies through directed flow analysis.
+Applies to all entities. Detects multi-party typologies through directed flow analysis.
 
 | Rule | Trigger | Severity |
 |------|---------|---------|
 | Reciprocal Payment | Bidirectional flows within 20%, each leg ≥ $10K | Medium |
 | Reciprocal — Escalated | Same, within 7 days | High |
-| Pass-Through / Transit | Inbound forwarded to different party within 48h, ≤ 10% retention, amount ≥ $10K, pattern ≥ 2× in period | High |
-| Pass-Through (single occurrence) | Same conditions but only one instance | Medium |
+| Pass-Through / Transit | Inbound forwarded within 48h, ≤ 10% retention, ≥ $10K, ≥ 2× in period | High |
+| Pass-Through (single) | Same, only 1 occurrence | Medium |
 | Net Flow Near-Zero | In/out within 10% on > $50K, ≥ 10 tx each direction | High |
 
 ---
 
 ## Risk scoring
 
-### Flag deduplication
+### Deduplication
 
-Before scoring, flags sharing more than 50% of their underlying transaction IDs are clustered together. Each cluster contributes to the score exactly once, at its highest-severity member. This prevents correlated flags on the same transactions from stacking into artificially inflated scores.
+Flags sharing more than 50% of their underlying transaction IDs are clustered together before scoring. Each cluster scores once at its highest severity, preventing correlated flags on the same transactions from stacking.
 
-### Composite score
+### Score formula
 
 ```
  First cluster:        High → 25 pts    Medium → 10 pts
  Each additional:      High → +12 pts   Medium → +5 pts
- Cross-category bonus: +10 if clusters span 2 or more categories
+ Cross-category bonus: +10 if clusters span 2+ categories
  Structuring bonus:    +5 per structuring cluster
                        ──────────────────────────────
                        capped at 100
 ```
 
-### Tier gates
+### Tiers
 
-| Score | Tier | Label | Action | Gate |
-|-------|------|-------|--------|------|
-| 0–25 | 1 | No Action | Monitor & close | — |
-| 26–50 | 2 | Enhanced Monitoring | Increase review cadence | — |
-| 51–74 | 3 | Investigator Escalation | Assign investigator | Requires ≥ 2 independent clusters |
-| 75–89 | 4 | SAR Consideration | 30-day investigation window | Requires ≥ 2 categories represented |
-| 90–100 | 5 | Mandatory SAR | File SAR + relationship review | Requires a Structuring or Network cluster |
+| Score | Tier | Label | Gate |
+|-------|------|-------|------|
+| 0–25 | 1 | No Action | — |
+| 26–50 | 2 | Enhanced Monitoring | — |
+| 51–74 | 3 | Investigator Escalation | ≥ 2 independent clusters |
+| 75–89 | 4 | SAR Consideration | ≥ 2 categories represented |
+| 90–100 | 5 | Mandatory SAR | Structuring or Network cluster required |
 
-Behavioral deviation alone cannot mandate a SAR filing. The Tier 5 gate explicitly requires at least one Structuring or Network cluster.
+Behavioral deviation alone cannot mandate a SAR filing.
 
 ---
 
 ## Transaction IDs
 
-Every flag surfaces both the SumSub-side transaction ID and your internal transaction ID, extracted directly from the SumSub API response.
+Every flag surfaces both transaction ID types from the SumSub API.
 
-| Field | API Source | Use |
-|-------|-----------|-----|
-| SumSub ID | `txn.id` (root level) | Clickable link to SumSub cockpit |
+| ID | API field | Use |
+|----|----------|-----|
+| SumSub ID | `txn.id` | Links directly to the SumSub cockpit |
 | Internal ID | `txn.data.txnId` | Your own reference ID |
 
-In the flag panel each transaction is shown as a labeled row with a direct cockpit link. Both ID types appear in the `.csv` export columns and in every RFI letter.
+Both appear in the flag detail panel, in the `.csv` export, and in the RFI letter.
 
 ---
 
-## RFI generation
+## RFI letters
 
-RFIs are consolidated per entity — one letter covering all flag clusters — and are generated only for Tier 4 and above. The letter is structured in two parts:
+RFIs are consolidated per entity — one letter covering all flag clusters — generated only for Tier 4 and above.
 
-**Part 1 — Why the RFI was issued** covers the flags detected, which thresholds were crossed, the regulatory basis for the request, and a SAR risk notice (31 U.S.C. § 5318(g)) where applicable.
-
-**Part 2 — What the client must provide** lists numbered questions tailored to the categories flagged. Structuring flags add questions on sub-threshold amount choices and underlying commercial obligations. Network flags add questions on the entity's economic role as an intermediate party. All entities receive standard questions on source of funds, third-party direction, and business activity.
-
----
-
-## Deploy
-
-### 1. Repository structure
-
-Your GitHub repo root must contain:
-
-```
-server.js          ← backend API + AML detection engine
-package.json       ← Node 20, Express 4.18
-.gitignore
-public/
-  index.html       ← frontend dashboard (served by Express)
-```
-
-### 2. Create a Render Web Service
-
-| Setting | Value |
-|---------|-------|
-| Build command | `npm install` |
-| Start command | `node server.js` |
-| Instance type | Free |
-
-### 3. Add environment variables
-
-In Render → your service → **Environment** tab:
-
-| Variable | Where to find it |
-|----------|-----------------|
-| `SUMSUB_TOKEN` | SumSub → avatar → Developer → App tokens → Token |
-| `SUMSUB_SECRET` | SumSub → avatar → Developer → App tokens → Secret Key |
-
-### 4. Verify
-
-```
-GET https://your-service.onrender.com/health
-→ { "ok": true, "credentials": "configured" }
-```
-
-Open your Render URL — the dashboard loads directly from `/`. No separate HTML file needed.
-
----
-
-## API
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Serves the dashboard |
-| `/health` | GET | Health check and credentials status |
-| `/analyze` | POST | Runs the full detection pipeline |
-| `/export/rfi` | POST | Downloads consolidated entity RFI as `.txt` |
-| `/debug` | GET | Shows filesystem layout on Render (troubleshooting) |
-
-**`POST /analyze` body:**
-
-```json
-{ "mode": "monthly" }
-{ "mode": "quarterly" }
-{ "mode": "custom", "customStart": "2026-03", "customEnd": "2026-05" }
-```
-
----
-
-## Outputs
-
-| File | Format | Contents |
-|------|--------|---------|
-| Summary report | `.txt` | Executive summary, flags by category, tier distribution, top 5 entities, High-severity rationales with both transaction ID types |
-| Flags export | `.csv` | Flag ID, Applicant ID, Rule, Category, Severity, Score, Tier, SAR Risk, Action, SumSub Txn IDs, Internal Txn IDs, Counterparties, Rationale |
-| RFI letter | `.txt` per entity | Consolidated letter covering all flag clusters, Tier 4+ only |
-
----
-
-## Security
-
-API keys are stored exclusively in Render's environment variables and never appear in code, GitHub, or any API response. Every request to SumSub is signed with HMAC-SHA256 using the pattern `timestamp + METHOD + path + body`. The system is fully stateless — no data is persisted between runs.
+Part 1 states which patterns were detected, which thresholds were crossed, and the regulatory basis. Part 2 lists numbered questions tailored to the categories flagged: Structuring flags add questions on sub-threshold amount choices and underlying commercial obligations; Network flags add questions on the entity's economic role as an intermediate party; all entities receive questions on source of funds, third-party direction, and business activity changes.
 
 ---
 
@@ -260,11 +177,48 @@ API keys are stored exclusively in Render's environment variables and never appe
 
 | Framework | Coverage |
 |-----------|---------|
-| FATF Recommendations | Structuring typologies, risk-based approach, trade-based money laundering |
-| FinCEN / BSA | 31 U.S.C. § 5324 (structuring), § 5318(g) (SAR filing obligations) |
-| ACAMS | Periodic review dashboards, lookback data points |
+| FATF Recommendations | Structuring typologies, risk-based approach, TBML |
+| FinCEN / BSA | 31 U.S.C. § 5324 (structuring), § 5318(g) (SAR obligations) |
+| ACAMS | Periodic review, lookback data points |
 | FFIEC AML Manual | Threshold calibration, independent validation |
-| NY DFS Part 504 | Ongoing scenario relevance, threshold documentation |
+| NY DFS Part 504 | Scenario relevance, threshold documentation |
+
+---
+
+## Deploy
+
+### Repository structure
+
+```
+server.js        ← backend + detection engine
+package.json
+.gitignore
+public/
+  index.html     ← frontend dashboard
+```
+
+### Render setup
+
+1. Create a new **Web Service** on Render, connected to this GitHub repo
+2. Set build command to `npm install` and start command to `node server.js`
+3. Add `SUMSUB_TOKEN` and `SUMSUB_SECRET` under the **Environment** tab
+4. Deploy — the dashboard is available at your Render URL immediately
+
+### Verify
+
+```
+GET /health  →  { "ok": true, "credentials": "configured" }
+```
+
+---
+
+## Outputs
+
+| File | Contents |
+|------|---------|
+| Summary `.txt` | Executive summary, flags by category, tier distribution, top 5 entities, full High-severity rationales |
+| Flags `.csv` | Every flag with Flag ID, Applicant, Rule, Severity, Score, Tier, SAR Risk, SumSub Txn IDs, Internal Txn IDs, Rationale |
+| RFI `.txt` | Consolidated entity letter, Tier 4+ only |
 
 ---
 
